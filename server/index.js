@@ -49,6 +49,7 @@ const db = client.db('plantConceptual')
 
 const plantConlection = db.collection('AllPlant')
 const orderCollection = db.collection('order')
+const userCollection = db.collection('user')
     // Generate jwt token
     app.post('/jwt', async (req, res) => {
       const email = req.body
@@ -86,6 +87,42 @@ res.send(result)
 
       res.send(result)  
     })
+
+    app.post('/user',async(req,res)=>{
+ 
+      const userData = req.body
+      
+      userData.role='customer',
+      userData.create_at=new Date().toISOString()
+      userData.loggedIn =new Date().toISOString()
+      
+      const query = {email:userData?.email}
+
+      const alreadyExists = await userCollection.findOne(query) 
+
+      console.log('user already exists',!!alreadyExists)
+
+      if(!!alreadyExists){
+
+        console.log('Updating user Data....');
+
+        const result = await userCollection.updateOne(query,{
+
+          $set:{loggedIn :new Date().toISOString()}
+          
+        })
+        return res.send(result)
+      }
+      
+      console.log('create ting user Data....');
+      
+    
+      const  result = await userCollection.insertOne(userData) 
+      
+
+
+     res.send(result)
+})
     app.get('/allplant',async(req,res)=>{
 
 

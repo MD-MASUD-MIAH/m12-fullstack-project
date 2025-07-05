@@ -82,7 +82,7 @@ const {user} = useAuth()
           <div className="flex justify-between">
             <p className="font-bold text-3xl text-gray-500">Price: {price}</p>
             <div>
-              <Button disabled={!user} onClick={() => setIsOpen(true)} label={user?"Purchase":'Login to Purchase'} />
+              <Button disabled={!user || user.email === seller.email } onClick={() => setIsOpen(true)} label={user?"Purchase":'Login to Purchase'} />
             </div>
           </div>
           <hr className="my-6" />
