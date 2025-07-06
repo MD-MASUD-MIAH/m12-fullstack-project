@@ -155,13 +155,16 @@ res.send(result)
 
     //  update plant quantity (increase/decrease)
 
-   app.use(express.json()); // make sure this is included
+   // make sure this is included
 
 app.patch('/quantity-update/:id', async (req, res) => {
   const id = req.params.id;
   const { quantityToUpdate, status } = req.body;
 
  const filter = {_id:new ObjectId(id)}
+
+
+
 
   if (!quantityToUpdate || !status) {
     return res.status(400).json({ message: "Missing fields" });
@@ -183,7 +186,14 @@ app.patch('/quantity-update/:id', async (req, res) => {
   res.status(200).json({ message: "Update received", id, quantityToUpdate, status });
 });
 
-
+app.get('/all-user',verifyToken,async  (req,res)=>{
+  
+  console.log(req.user);
+  
+  const filter = { email: { $ne: req?.user?.email } };
+   const result = await userCollection.find(filter).toArray() 
+   res.send(result)
+})
     // Logout
     app.get('/logout', async (req, res) => {
       try {

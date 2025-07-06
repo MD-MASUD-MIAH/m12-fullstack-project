@@ -1,9 +1,30 @@
+import { useQuery } from '@tanstack/react-query'
 import UserDataRow from '../../../components/Dashboard/TableRows/UserDataRow'
+import { axiosSecure } from '../../../hooks/useAxiosSecure'
+import LoadingSpinner from '../../../components/Shared/LoadingSpinner'
+import UpdateUserRole from '../../../components/Modal/UpdateUserRole'
 
 const ManageUsers = () => {
+
+  const {data:users,isLoading}=useQuery({
+
+    queryKey:['users'],
+    queryFn:async ()=>{
+
+      const {data} = await axiosSecure('/all-user')  
+
+      return data
+    }
+  })
+
+  if(isLoading)return <LoadingSpinner></LoadingSpinner>
+
+ console.log(users);
+ 
   return (
     <>
       <div className='container mx-auto px-4 sm:px-8'>
+        <UpdateUserRole></UpdateUserRole>
         <div className='py-8'>
           <div className='-mx-4 sm:-mx-8 px-4 sm:px-8 py-4 overflow-x-auto'>
             <div className='inline-block min-w-full shadow rounded-lg overflow-hidden'>
@@ -38,7 +59,9 @@ const ManageUsers = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <UserDataRow />
+               {
+                users?.map(user=><UserDataRow key={user._id} user={user} />)
+               }
                 </tbody>
               </table>
             </div>
