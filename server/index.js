@@ -139,6 +139,51 @@ res.send(result)
 
   res.send(result)
     })
+
+    app.get('/user/role/:email',async(req,res)=>{
+
+   const userEmail = req.params.email 
+
+   const result =await userCollection.findOne({email:userEmail}) 
+
+   if(!result) return res.status(404).send({message:'User Not Found'})
+   res.send({role:result?.role})
+
+
+
+    }) 
+
+    //  update plant quantity (increase/decrease)
+
+   app.use(express.json()); // make sure this is included
+
+app.patch('/quantity-update/:id', async (req, res) => {
+  const id = req.params.id;
+  const { quantityToUpdate, status } = req.body;
+
+ const filter = {_id:new ObjectId(id)}
+
+  if (!quantityToUpdate || !status) {
+    return res.status(400).json({ message: "Missing fields" });
+  }
+
+
+  const updateDoc = {
+
+    $inc:{
+
+      quantity:status ==='increase'? quantityToUpdate : -quantityToUpdate
+    }
+  }
+
+ const result = await plantConlection.updateOne(filter,updateDoc) 
+
+ res.send(result)
+
+  res.status(200).json({ message: "Update received", id, quantityToUpdate, status });
+});
+
+
     // Logout
     app.get('/logout', async (req, res) => {
       try {

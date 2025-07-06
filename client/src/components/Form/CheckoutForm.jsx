@@ -5,7 +5,7 @@ import "./checkoutForm.css";
 import useAxiosSecure from "../../hooks/useAxiosSecure";
 import useAuth from "../../hooks/useAuth";
 import toast from "react-hot-toast";
-const CheckoutForm = ({ totalPrice, closeModal,orderData }) => {
+const CheckoutForm = ({ totalPrice, closeModal,orderData, fetchPlant }) => {
   const stripe = useStripe();
   const elements = useElements();
   const axiosSecure = useAxiosSecure()
@@ -58,19 +58,19 @@ const {user} = useAuth()
     }
 
     // Use your card Element with other Stripe.js APIs
-    const { error, paymentMethod } = await stripe.createPaymentMethod({
+    const result = await stripe.createPaymentMethod({
       type: "card",
       card,
     });
 
-    if (error) {
-      console.log("[error]", error);
-      setCardError(error.message);
+    if ( result.error) {
+      console.log("[error]",result.error);
+      setCardError(result.error.message);
       setProcessing(false);
 
       return;
     } else {
-      console.log("[PaymentMethod]", paymentMethod);
+      console.log("[PaymentMethod]", result.paymentMethod);
       setCardError(null);
        setProcessing(false)
         const { error, paymentIntent } = await stripe.confirmCardPayment(
@@ -104,19 +104,27 @@ try{
 
 
   
-       await axiosSecure.post('/order',orderData).then(res=>{
+   const {data} =    await axiosSecure.post('/order',orderData)
 
-     if(res.data.insertedId){
+     if(data.insertedId){
 
        toast.success('Order Placed Successfully')
-     }
 
       
-      }).catch(err=>{
 
-        console.log(err);
-        
-      })
+       
+     }
+
+    
+         const result = await axiosSecure.patch(
+          `/quantity-update/${orderData?.plantId}`,
+          { quantityToUpdate: orderData?.quantity, status: 'decrease' }
+        )
+
+        console.log(result.data);
+
+fetchPlant()
+    
 }catch(err){
 
   console.log(err);

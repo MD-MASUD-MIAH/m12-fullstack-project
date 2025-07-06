@@ -6,7 +6,7 @@ import {loadStripe} from '@stripe/stripe-js';
 import { Elements } from "@stripe/react-stripe-js";
 import CheckoutForm from "../Form/CheckoutForm";
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK_KEY);
-const PurchaseModal = ({ closeModal, isOpen, plant }) => {
+const PurchaseModal = ({ closeModal, isOpen, plant,  fetchPlant}) => {
   const { user } = useAuth();
   // Total Price Calculation
   const { name, category, quantity, price,seller ,_id,image} = plant || {};
@@ -121,7 +121,7 @@ console.log(orderData);
               <p className="text-sm text-gray-500">Total Price : {totalPrice}</p>
             </div>
                <Elements stripe={stripePromise}>
-      <CheckoutForm closeModal={closeModal} orderData={orderData} totalPrice={totalPrice}></CheckoutForm>
+      <CheckoutForm closeModal={closeModal} orderData={orderData}   fetchPlant={fetchPlant} totalPrice={totalPrice}></CheckoutForm>
     </Elements>
           </DialogPanel>
         </div>
