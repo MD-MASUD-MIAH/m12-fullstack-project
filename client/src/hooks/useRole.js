@@ -14,7 +14,7 @@ export const useRole =()=>{
     const axiosSecure = useAxiosSecure()
 
 
-  const { data:role, isLoading: isRoleLoading } = useQuery({
+  const { data:role, isLoading:isRoleLoading } = useQuery({
     queryKey: ['role', user?.email],
     enabled: !loading && !!user?.email,
     queryFn: async () => {

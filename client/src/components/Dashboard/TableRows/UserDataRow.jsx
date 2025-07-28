@@ -4,10 +4,12 @@ import UpdateUserRole from "../../Modal/UpdateUserRole"
 
 const UserDataRow = ({user}) => {
 
-  const {role} = user 
+  const {role,email} = user 
 
- 
+   console.log(user);
+   
 
+    console.log(email);
     
   
   return (
@@ -27,7 +29,7 @@ const UserDataRow = ({user}) => {
         {/* Modal */}
        <UpdateUserRole 
       
-         
+          userEmail={email}
           role={role}></UpdateUserRole>
       </td>
     </tr>
