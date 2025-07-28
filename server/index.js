@@ -209,6 +209,31 @@ app.get('/all-user',verifyToken,async  (req,res)=>{
       }
     })
 
+   app.patch(
+      '/user/role/update/:email',
+      verifyToken,
+     
+      async (req, res) => {
+        const email = req.params.email
+        const { role } = req.body
+        console.log(role)
+        const filter = { email: email }
+        const updateDoc = {
+          $set: {
+            role,
+            status: 'verified',
+          },
+        }
+        const result = await userCollection.updateOne(filter, updateDoc)
+        console.log(result)
+        res.send(result)
+      }
+    )
+
+
+
+
+
   // payment post. 
   app.post('/create-payments-intent',async(req,res)=>{
 const {plantId,quantity} = req.body 
