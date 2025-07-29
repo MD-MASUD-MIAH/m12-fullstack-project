@@ -1,13 +1,14 @@
 import { Button, Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useMutation , useQueryClient} from '@tanstack/react-query'
 import { useState } from 'react'
-import { axiosSecure } from '../../hooks/useAxiosSecure'
+
 import toast from 'react-hot-toast'
+import useAxiosSecure from '../../hooks/useAxiosSecure'
 
 
  const  UpdateUserRole =({role,userEmail}) =>{
    const queryClient = useQueryClient()
-
+const axiosSecure = useAxiosSecure()
   const [updatedRole, setUpdatedRole] = useState(role)
   console.log(updatedRole)
 

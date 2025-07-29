@@ -1,38 +1,38 @@
-require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-const cookieParser = require('cookie-parser')
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
-const jwt = require('jsonwebtoken')
-const stripe = require('stripe')(process.env.STRIPE_SK_KEY)
-const port = process.env.PORT || 3000
-const app = express()
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(process.env.STRIPE_SK_KEY);
+const port = process.env.PORT || 3000;
+const app = express();
 // middleware
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: ["http://localhost:5173", "http://localhost:5174"],
   credentials: true,
   optionSuccessStatus: 200,
-}
-app.use(cors(corsOptions))
+};
+app.use(cors(corsOptions));
 
-app.use(express.json())
-app.use(cookieParser())
+app.use(express.json());
+app.use(cookieParser());
 
 const verifyToken = async (req, res, next) => {
-  const token = req.cookies?.token
+  const token = req.cookies?.token;
 
   if (!token) {
-    return res.status(401).send({ message: 'unauthorized access' })
+    return res.status(401).send({ message: "unauthorized access" });
   }
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      console.log(err)
-      return res.status(401).send({ message: 'unauthorized access' })
+      console.log(err);
+      return res.status(401).send({ message: "unauthorized access" });
     }
-    req.user = decoded
-    next()
-  })
-}
+    req.user = decoded;
+    next();
+  });
+};
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(process.env.MONGODB_URI, {
@@ -41,246 +41,270 @@ const client = new MongoClient(process.env.MONGODB_URI, {
     strict: true,
     deprecationErrors: true,
   },
-})
+});
 async function run() {
   try {
+    const db = client.db("plantConceptual");
 
-const db = client.db('plantConceptual') 
-
-const plantConlection = db.collection('AllPlant')
-const orderCollection = db.collection('order')
-const userCollection = db.collection('user')
+    const plantConlection = db.collection("AllPlant");
+    const orderCollection = db.collection("order");
+    const userCollection = db.collection("user");
     // Generate jwt token
-    app.post('/jwt', async (req, res) => {
-      const email = req.body
+    app.post("/jwt", async (req, res) => {
+      const email = req.body;
       const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: '365d',
-      })
+        expiresIn: "365d",
+      });
       res
-        .cookie('token', token, {
+        .cookie("token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
-        .send({ success: true })
-    })
-    app.post('/add-plant',async(req,res)=>{
- 
+        .send({ success: true });
+    });
+    app.post("/add-plant", async (req, res) => {
+      const newPlant = req.body;
 
-      const newPlant = req.body 
+      const result = await plantConlection.insertOne(newPlant);
 
+      res.send(result);
+    });
 
-     
-      
-   const result =  await plantConlection.insertOne(newPlant)
+    app.post("/order", async (req, res) => {
+      const order = req.body;
 
-res.send(result)
-    })
+      const result = await orderCollection.insertOne(order);
 
+      res.send(result);
+    });
 
-    app.post('/order',async(req,res)=>{
+    app.post("/user", async (req, res) => {
+      const userData = req.body;
 
-      const order = req.body 
+      (userData.role = "customer"),
+        (userData.create_at = new Date().toISOString());
+      userData.loggedIn = new Date().toISOString();
 
+      const query = { email: userData?.email };
 
-      const result = await  orderCollection.insertOne(order)
+      const alreadyExists = await userCollection.findOne(query);
 
-      res.send(result)  
-    })
+      console.log("user already exists", !!alreadyExists);
 
-    app.post('/user',async(req,res)=>{
- 
-      const userData = req.body
-      
-      userData.role='customer',
-      userData.create_at=new Date().toISOString()
-      userData.loggedIn =new Date().toISOString()
-      
-      const query = {email:userData?.email}
+      if (!!alreadyExists) {
+        console.log("Updating user Data....");
 
-      const alreadyExists = await userCollection.findOne(query) 
-
-      console.log('user already exists',!!alreadyExists)
-
-      if(!!alreadyExists){
-
-        console.log('Updating user Data....');
-
-        const result = await userCollection.updateOne(query,{
-
-          $set:{loggedIn :new Date().toISOString()}
-          
-        })
-        return res.send(result)
+        const result = await userCollection.updateOne(query, {
+          $set: { loggedIn: new Date().toISOString() },
+        });
+        return res.send(result);
       }
-      
-      console.log('create ting user Data....');
-      
-    
-      const  result = await userCollection.insertOne(userData) 
-      
 
+      console.log("create ting user Data....");
 
-     res.send(result)
-})
-    app.get('/allplant',async(req,res)=>{
+      const result = await userCollection.insertOne(userData);
 
+      res.send(result);
+    });
+    app.get("/allplant", async (req, res) => {
+      const result = await plantConlection.find().toArray();
 
-      const result = await plantConlection.find().toArray() 
+      res.send(result);
+    });
 
-      res.send(result)
-    })
+    app.get("/plant/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
 
-    app.get('/plant/:id',async(req,res)=>{
-  const id = req.params.id 
-  const query = {_id: new ObjectId(id)}
+      const result = await plantConlection.findOne(query);
 
-  const result = await plantConlection.findOne(query) 
+      res.send(result);
+    });
 
-  res.send(result)
-    })
+    app.get("/user/role/:email", async (req, res) => {
+      const userEmail = req.params.email;
 
-    app.get('/user/role/:email',async(req,res)=>{
+      const result = await userCollection.findOne({ email: userEmail });
 
-   const userEmail = req.params.email 
-
-   const result =await userCollection.findOne({email:userEmail}) 
-
-   if(!result) return res.status(404).send({message:'User Not Found'})
-   res.send({role:result?.role})
-
-
-
-    }) 
+      if (!result) return res.status(404).send({ message: "User Not Found" });
+      res.send({ role: result?.role });
+    });
 
     //  update plant quantity (increase/decrease)
 
-   // make sure this is included
+    // make sure this is included
 
-app.patch('/quantity-update/:id', async (req, res) => {
-  const id = req.params.id;
-  const { quantityToUpdate, status } = req.body;
+    app.patch("/quantity-update/:id", async (req, res) => {
+      const id = req.params.id;
+      const { quantityToUpdate, status } = req.body;
 
- const filter = {_id:new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) };
 
+      if (!quantityToUpdate || !status) {
+        return res.status(400).json({ message: "Missing fields" });
+      }
 
+      const updateDoc = {
+        $inc: {
+          quantity:
+            status === "increase" ? quantityToUpdate : -quantityToUpdate,
+        },
+      };
 
+      const result = await plantConlection.updateOne(filter, updateDoc);
 
-  if (!quantityToUpdate || !status) {
-    return res.status(400).json({ message: "Missing fields" });
-  }
+      res.send(result);
 
+      res
+        .status(200)
+        .json({ message: "Update received", id, quantityToUpdate, status });
+    });
 
-  const updateDoc = {
+    app.get("/all-user", verifyToken, async (req, res) => {
+      console.log(req.user);
 
-    $inc:{
-
-      quantity:status ==='increase'? quantityToUpdate : -quantityToUpdate
-    }
-  }
-
- const result = await plantConlection.updateOne(filter,updateDoc) 
-
- res.send(result)
-
-  res.status(200).json({ message: "Update received", id, quantityToUpdate, status });
-});
-
-app.get('/all-user',verifyToken,async  (req,res)=>{
-  
-  console.log(req.user);
-  
-  const filter = { email: { $ne: req?.user?.email } };
-   const result = await userCollection.find(filter).toArray() 
-   res.send(result)
-})
+      const filter = { email: { $ne: req?.user?.email } };
+      const result = await userCollection.find(filter).toArray();
+      res.send(result);
+    });
     // Logout
-    app.get('/logout', async (req, res) => {
+    app.get("/logout", async (req, res) => {
       try {
         res
-          .clearCookie('token', {
+          .clearCookie("token", {
             maxAge: 0,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
           })
-          .send({ success: true })
+          .send({ success: true });
       } catch (err) {
-        res.status(500).send(err)
+        res.status(500).send(err);
       }
+    });
+
+    app.patch("/user/role/update/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const { role } = req.body;
+      console.log(role);
+      const filter = { email: email };
+      const updateDoc = {
+        $set: {
+          role,
+          status: "verified",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc);
+      console.log(result);
+      res.send(result);
+    });
+
+    app.patch(
+      "/become-seller-request/:email",
+      verifyToken,
+      async (req, res) => {
+        const email = req.params.email;
+
+        const filter = { email: email };
+
+        const updateOne = {
+          $set: {
+            status: "request",
+          },
+        };
+
+        const result = await userCollection.updateOne(filter, updateOne);
+
+        console.log(result);
+
+        res.send(result);
+      }
+    );
+
+    app.get('/admin-static', async (req,res)=>{
+
+      const totalUser = await userCollection.estimatedDocumentCount() 
+    const totalPlant = await plantConlection.estimatedDocumentCount() 
+    const totalOrder = await orderCollection.estimatedDocumentCount()
+    
+    const result = await orderCollection.aggregate([
+  {
+    $addFields: {
+      createAt: { $toDate: '$_id' } // Converts ObjectId to ISODate
+    }
+  },
+  {
+    $group: {
+      _id: {
+        $dateToString: {
+          format: "%d-%m-%Y",
+          date: "$createAt"
+        }
+      },
+    totalRevenue:{$sum:'$price'},
+     dayTotalOrder:{$sum:1}
+    }
+  }
+]).toArray();
+
+
+const chartData = result.map(data=>({
+
+  date:data._id ,
+  totalRevenue:data?.totalRevenue, 
+  dayTotalOrder:data?.dayTotalOrder
+
+})) 
+
+const totalAmount = result.reduce((sum, data) => {
+  return sum + (data?.totalRevenue || 0);
+}, 0);
+
+
+
+
+    res.send({chartData,totalOrder,totalPlant,totalUser,totalAmount})
     })
 
-   app.patch(
-      '/user/role/update/:email',
-      verifyToken,
-     
-      async (req, res) => {
-        const email = req.params.email
-        const { role } = req.body
-        console.log(role)
-        const filter = { email: email }
-        const updateDoc = {
-          $set: {
-            role,
-            status: 'verified',
-          },
-        }
-        const result = await userCollection.updateOne(filter, updateDoc)
-        console.log(result)
-        res.send(result)
-      }
-    )
+    // payment post.
+    app.post("/create-payments-intent", async (req, res) => {
+      const { plantId, quantity } = req.body;
+      console.log(plantId, quantity);
 
+      const plant = await plantConlection.findOne({
+        _id: new ObjectId(plantId),
+      });
 
+      if (!plant) return res.status(404).send({ message: "plant not Found" });
 
+      const totalPrice = quantity * plant.price * 100;
 
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: totalPrice, // Amount in smallest currency unit (e.g. 2000 = $20.00)
+        currency: "usd",
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
 
-  // payment post. 
-  app.post('/create-payments-intent',async(req,res)=>{
-const {plantId,quantity} = req.body 
-console.log(plantId,quantity); 
+      res.send({ clientSecret: client_secret });
+    });
 
-const plant = await plantConlection.findOne({_id:new ObjectId(plantId)})
-
-if(!plant)return res.status(404).send({message:'plant not Found'})
-
-
-
-const totalPrice = quantity*plant.price*100
-
-const {client_secret} = await stripe.paymentIntents.create({
-  amount:totalPrice, // Amount in smallest currency unit (e.g. 2000 = $20.00)
-  currency: 'usd',
-  automatic_payment_methods: {
-    enabled: true
-  },
-});
-
-
-res.send({clientSecret:client_secret})
-
-
-
-  }
-  )
-
-  
-
-    
     // Send a ping to confirm a successful connection
-    await client.db('admin').command({ ping: 1 })
+    await client.db("admin").command({ ping: 1 });
     console.log(
-      'Pinged your deployment. You successfully connected to MongoDB!'
-    )
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
   }
 }
-run().catch(console.dir)
+run().catch(console.dir);
 
-app.get('/', (req, res) => {
-  res.send('Hello from plantNet Server..')
-})
+app.get("/", (req, res) => {
+  res.send("Hello from plantNet Server..");
+});
 
 app.listen(port, () => {
-  console.log(`plantNet is running on port ${port}`)
-})
+  console.log(`plantNet is running on port ${port}`);
+});
