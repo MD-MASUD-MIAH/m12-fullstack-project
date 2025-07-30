@@ -49,7 +49,34 @@ async function run() {
     const plantConlection = db.collection("AllPlant");
     const orderCollection = db.collection("order");
     const userCollection = db.collection("user");
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req?.user?.email;
+      const user = await userCollection.findOne({ email });
+
+      if (!user || user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ message: "admin only action", role: user?.role });
+      }
+
+      next();
+    };
+    const verifySeller = async (req, res, next) => {
+      const email = req?.user?.email;
+      const user = await userCollection.findOne({ email });
+
+      if (!user || user?.role !== "seller") {
+        return res
+          .status(403)
+          .send({ message: "admin only action", role: user?.role });
+      }
+
+      next();
+    };
+
     // Generate jwt token
+
     app.post("/jwt", async (req, res) => {
       const email = req.body;
       const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
@@ -63,7 +90,7 @@ async function run() {
         })
         .send({ success: true });
     });
-    app.post("/add-plant", async (req, res) => {
+    app.post("/add-plant", verifyToken, verifySeller, async (req, res) => {
       const newPlant = req.body;
 
       const result = await plantConlection.insertOne(newPlant);
@@ -78,6 +105,26 @@ async function run() {
 
       res.send(result);
     });
+    app.get("/order/customer/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+
+      const filter = { "customer.email": email };
+
+      const result = await orderCollection.find(filter).toArray();
+
+      res.send(result);
+    });
+    app.get("/order/seller/:email", verifyToken,verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+
+      const filter = { "seller.email": email };
+
+      const result = await orderCollection.find(filter).toArray();
+
+      res.send(result);
+    });
+
+
 
     app.post("/user", async (req, res) => {
       const userData = req.body;
@@ -161,7 +208,7 @@ async function run() {
         .json({ message: "Update received", id, quantityToUpdate, status });
     });
 
-    app.get("/all-user", verifyToken, async (req, res) => {
+    app.get("/all-user", verifyToken, verifyAdmin, async (req, res) => {
       console.log(req.user);
 
       const filter = { email: { $ne: req?.user?.email } };
@@ -183,21 +230,26 @@ async function run() {
       }
     });
 
-    app.patch("/user/role/update/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const { role } = req.body;
-      console.log(role);
-      const filter = { email: email };
-      const updateDoc = {
-        $set: {
-          role,
-          status: "verified",
-        },
-      };
-      const result = await userCollection.updateOne(filter, updateDoc);
-      console.log(result);
-      res.send(result);
-    });
+    app.patch(
+      "/user/role/update/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const { role } = req.body;
+        console.log(role);
+        const filter = { email: email };
+        const updateDoc = {
+          $set: {
+            role,
+            status: "verified",
+          },
+        };
+        const result = await userCollection.updateOne(filter, updateDoc);
+        console.log(result);
+        res.send(result);
+      }
+    );
 
     app.patch(
       "/become-seller-request/:email",
@@ -221,50 +273,45 @@ async function run() {
       }
     );
 
-    app.get('/admin-static', async (req,res)=>{
+    app.get("/admin-static", verifyToken, verifyAdmin, async (req, res) => {
+      const totalUser = await userCollection.estimatedDocumentCount();
+      const totalPlant = await plantConlection.estimatedDocumentCount();
+      const totalOrder = await orderCollection.estimatedDocumentCount();
 
-      const totalUser = await userCollection.estimatedDocumentCount() 
-    const totalPlant = await plantConlection.estimatedDocumentCount() 
-    const totalOrder = await orderCollection.estimatedDocumentCount()
-    
-    const result = await orderCollection.aggregate([
-  {
-    $addFields: {
-      createAt: { $toDate: '$_id' } // Converts ObjectId to ISODate
-    }
-  },
-  {
-    $group: {
-      _id: {
-        $dateToString: {
-          format: "%d-%m-%Y",
-          date: "$createAt"
-        }
-      },
-    totalRevenue:{$sum:'$price'},
-     dayTotalOrder:{$sum:1}
-    }
-  }
-]).toArray();
+      const result = await orderCollection
+        .aggregate([
+          {
+            $addFields: {
+              createAt: { $toDate: "$_id" }, // Converts ObjectId to ISODate
+            },
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: "%d-%m-%Y",
+                  date: "$createAt",
+                },
+              },
+              totalRevenue: { $sum: "$price" },
+              dayTotalOrder: { $sum: 1 },
+            },
+          },
+        ])
+        .toArray();
 
+      const chartData = result.map((data) => ({
+        date: data._id,
+        totalRevenue: data?.totalRevenue,
+        dayTotalOrder: data?.dayTotalOrder,
+      }));
 
-const chartData = result.map(data=>({
+      const totalAmount = result.reduce((sum, data) => {
+        return sum + (data?.totalRevenue || 0);
+      }, 0);
 
-  date:data._id ,
-  totalRevenue:data?.totalRevenue, 
-  dayTotalOrder:data?.dayTotalOrder
-
-})) 
-
-const totalAmount = result.reduce((sum, data) => {
-  return sum + (data?.totalRevenue || 0);
-}, 0);
-
-
-
-
-    res.send({chartData,totalOrder,totalPlant,totalUser,totalAmount})
-    })
+      res.send({ chartData, totalOrder, totalPlant, totalUser, totalAmount });
+    });
 
     // payment post.
     app.post("/create-payments-intent", async (req, res) => {
